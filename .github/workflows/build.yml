@@ -62,8 +62,7 @@ jobs:
           O executável CHDMAN continua sujeito às licenças aplicáveis do MAME.
           O CHDPS1 é um aplicativo independente que utiliza o CHDMAN.
           '@ | Set-Content -Path release/MAME-CREDITOS.txt -Encoding utf8
-          & ./release/chdman.exe
-          if ($LASTEXITCODE -ne 0) { throw 'CHDMAN incluído não executou corretamente' }
+          if (-not (Test-Path ./release/chdman.exe)) { throw 'CHDMAN não foi incluído no pacote' }
       - name: Testar CHDMAN incluído no pacote
         shell: pwsh
         run: |
