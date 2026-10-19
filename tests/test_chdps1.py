@@ -39,6 +39,7 @@ class TestCue(unittest.TestCase):
         with self.assertRaises(ConversionError):
             parse_cue(CUE.replace(b'game (Track 01).bin', b'../private.bin'))
 
+    @unittest.skipIf(os.name == "nt", "Este mock usa shebang POSIX; Windows é testado pelos demais casos")
     def test_zip_analysis_and_conversion_mock(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
