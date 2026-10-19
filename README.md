@@ -14,9 +14,9 @@ Ferramenta gratuita de conversão **CUE + BIN → CHD**, compatível com dumps d
 
 ## Windows (interface gráfica)
 
-Baixe o artefato `CHDPS1-Windows.zip` em **Actions → Test and build Windows** na última execução concluída, ou execute `python chdps1.py` com Python 3.10+ e Tkinter.
+**[Baixar CHDPS1 Windows completo (GitHub Releases)](https://github.com/danilostorm/chdps1/releases/latest)** — pacote portátil que inclui `CHDPS1.exe` (interface), `CHDPS1-CLI.exe` e o `chdman.exe` original do MAME 0.289. Basta extrair o ZIP e executar `CHDPS1.exe`. Nenhuma instalação adicional de CHDMAN é necessária no Windows. O programa é para Windows 10 ou posterior (x64, CPU x86-64-v2).
 
-**Necessário:** coloque `chdman.exe` oficial do [MAME](https://www.mamedev.org/release.html) ao lado de `CHDPS1.exe`, ou indique seu caminho no aplicativo. O CHDMAN não é redistribuído neste repositório.
+**CHDMAN:** o pacote completo da Release já inclui uma cópia do executável oficial do [MAME 0.289](https://www.mamedev.org/release.html) e arquivos auxiliares. Não é necessário procurá-lo manualmente. Os arquivos de código-fonte permanecem separados dos binários publicados na Release.
 
 1. Clique em **Procurar** e selecione o ZIP da ROM ou o CUE.
 2. Clique em **Analisar tracks** para conferir as pistas detectadas.
@@ -61,7 +61,7 @@ No jogo *Bakusou Dekotora Densetsu* enviado para teste, o analisador encontrou *
 python -m unittest discover -s tests -v
 ```
 
-A CI do GitHub Actions testa o parser e compila executáveis Windows. Para validar **a conversão verdadeira de um jogo**, rode com CHDMAN oficial e, de preferência, abra o CHD em um emulador.
+A CI do GitHub Actions testa o parser, executa conversões reais sintéticas com o CHDMAN oficial do MAME, compila os executáveis Windows, monta o ZIP completo e publica a Release automaticamente. O teste da ROM comercial de exemplo não faz parte da CI. Para validar **a conversão verdadeira de um jogo**, rode com CHDMAN oficial e, de preferência, abra o CHD em um emulador.
 
 ## Créditos
 
