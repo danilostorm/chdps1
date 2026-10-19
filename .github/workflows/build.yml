@@ -1,9 +1,13 @@
-name: Test and build Windows
+name: Testar, compilar e publicar CHDPS1
 on:
   push:
     branches: [main]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -12,30 +16,94 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Instalar CHDMAN oficial para teste de conversão real
+      - name: Instalar CHDMAN MAME para teste real
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends mame-tools
-      - run: python -m unittest discover -s tests -v
+      - name: Executar testes, incluindo CHD real
+        run: python -m unittest discover -s tests -v
+
   windows:
     needs: test
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install pyinstaller
-      - run: python -m unittest discover -s tests -v
-      - run: pyinstaller --noconfirm --clean --onefile --noconsole --name CHDPS1 chdps1.py
-      - run: pyinstaller --noconfirm --clean --onefile --console --name CHDPS1-CLI chdps1.py
-      - name: Pacote para Windows
+      - name: Instalar PyInstaller
+        run: python -m pip install pyinstaller
+      - name: Testes unitários
+        run: python -m unittest discover -s tests -v
+      - name: Compilar aplicativo e CLI portáteis
+        run: |
+          pyinstaller --noconfirm --clean --onefile --noconsole --name CHDPS1 chdps1.py
+          pyinstaller --noconfirm --clean --onefile --console --name CHDPS1-CLI chdps1.py
+      - name: Baixar CHDMAN original do MAME 0.289
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://github.com/mamedev/mame/releases/download/mame0289/mame0289b_x64.exe'
+          Invoke-WebRequest -Uri $url -OutFile mame0289b_x64.exe
+          7z x mame0289b_x64.exe '-omame-unpacked' -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Falhou a extração do pacote oficial MAME' }
+          $chd = Get-ChildItem mame-unpacked -Filter chdman.exe -Recurse -File | Select-Object -First 1
+          if (-not $chd) { throw 'chdman.exe não encontrado no pacote oficial' }
           New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item $chd.FullName release/chdman.exe
+          Get-ChildItem $chd.Directory.FullName -Filter '*.dll' -File | ForEach-Object { Copy-Item $_.FullName release/ }
           Copy-Item dist/CHDPS1.exe,dist/CHDPS1-CLI.exe,README.md release/
-          Compress-Archive -Path release/* -DestinationPath CHDPS1-Windows.zip
+          @'
+          CHDMAN é parte do projeto MAME (https://www.mamedev.org/).
+          Incluído a partir do pacote oficial MAME 0.289 Windows x64.
+          Código-fonte e licenças do MAME: https://github.com/mamedev/mame/tree/mame0289
+          O executável CHDMAN continua sujeito às licenças aplicáveis do MAME.
+          O CHDPS1 é um aplicativo independente que utiliza o CHDMAN.
+          '@ | Set-Content -Path release/MAME-CREDITOS.txt -Encoding utf8
+          & ./release/chdman.exe
+          if ($LASTEXITCODE -ne 0) { throw 'CHDMAN incluído não executou corretamente' }
+      - name: Testar CHDMAN incluído no pacote
+        shell: pwsh
+        run: |
+          $env:CHDMAN = (Resolve-Path './release/chdman.exe').Path
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Empacotar Windows completo
+        shell: pwsh
+        run: |
+          Compress-Archive -Path release/* -DestinationPath CHDPS1-Windows-Completo.zip -Force
+          $zip = Get-Item CHDPS1-Windows-Completo.zip
+          Write-Host "Pacote completo pronto: $($zip.Length) bytes"
       - uses: actions/upload-artifact@v4
         with:
-          name: CHDPS1-Windows
-          path: CHDPS1-Windows.zip
+          name: CHDPS1-Windows-Completo
+          path: CHDPS1-Windows-Completo.zip
+      - name: Publicar GitHub Release v1.0.0
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = 'v1.0.0'
+          $notes = @'
+          CHDPS1 v1.0.0 — Windows portátil e completo.
+
+          - Interface gráfica em português e aplicativo CLI
+          - CHDMAN MAME 0.289 oficial incluso: nenhuma instalação separada
+          - Conversão .cue e .zip com múltiplos BINs/tracks em um único CHD
+          - Pré-validação de CUE, verificação de integridade CHD e preservação dos originais
+          - Para usar: extrair o ZIP, executar CHDPS1.exe e selecionar a ROM
+          - A conversão não inclui ROMs comerciais
+
+          Requer Windows 10+ x64 compatível com x86-64-v2.
+          Crédito do CHDMAN: https://www.mamedev.org/ | fontes e licenças: https://github.com/mamedev/mame/tree/mame0289
+          '@
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag CHDPS1-Windows-Completo.zip --repo $env:GITHUB_REPOSITORY --clobber
+          } else {
+            gh release create $tag CHDPS1-Windows-Completo.zip --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'CHDPS1 v1.0.0 - Windows completo' --notes $notes --latest
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
